@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import DisciplineSidebar from './DisciplineSidebar'; // Adjust path if necessary
+import DisciplineSidebar from './DisciplineSidebar';
 
 export default function DisciplineDashboard() {
   const [totalStudents, setTotalStudents] = useState(0);
   const [checkedStudentsCount, setCheckedStudentsCount] = useState(0);
   const [lackingStudentsCount, setLackingStudentsCount] = useState(0);
+  const [totalClasses, setTotalClasses] = useState(0);
   const [selectedTerm, setSelectedTerm] = useState('Term 1');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -23,6 +24,9 @@ export default function DisciplineDashboard() {
       const studentsData = await studentsRes.json();
       setTotalStudents(studentsData.length || 0);
 
+      const uniqueClasses = new Set(studentsData.map(s => s.class_name || s.class || s.grade).filter(Boolean));
+      setTotalClasses(uniqueClasses.size);
+
       // 2. Fetch master materials configuration list to find minimums
       const matRes = await fetch('http://localhost:5000/api/v1/getall');
       if (!matRes.ok) throw new Error('Failed to fetch materials configuration');
@@ -33,7 +37,6 @@ export default function DisciplineDashboard() {
       if (!studMatRes.ok) throw new Error('Failed to fetch student material records');
       const studMatData = await studMatRes.json();
 
-      // Calculate how many students have completely fulfilled vs lacking materials
       let fullyCheckedCount = 0;
       let lackingCount = 0;
 
@@ -64,187 +67,250 @@ export default function DisciplineDashboard() {
     }
   };
 
-  // Calculate percentages for visualization bars
   const totalSafeStudents = totalStudents > 0 ? totalStudents : 1;
   const checkedPercentage = Math.round((checkedStudentsCount / totalSafeStudents) * 100);
   const lackingPercentage = Math.round((lackingStudentsCount / totalSafeStudents) * 100);
 
+  // Calculate dynamic heights for the bar chart based on student counts relative to total students
+  const maxBarCount = Math.max(totalStudents, 1);
+  const getBarHeight = (count) => {
+    if (loading || totalStudents === 0) return '0%';
+    const height = Math.round((count / maxBarCount) * 100);
+    return `${Math.max(height, 8)}%`; // Minimum height of 8% for visibility
+  };
+
   return (
     <>
       <style>{`
+        * {
+          box-sizing: border-box;
+        }
         body {
           margin: 0;
-          background-color: #f4f6f9;
-          font-family: Arial, sans-serif;
+          background-color: #f8fafc;
+          font-family: 'Inter', system-ui, -apple-system, sans-serif;
+          color: #1e293b;
         }
         .dashboard-container {
           display: flex;
           min-height: 100vh;
         }
         .main-content {
-          margin-left: 250px; /* Matches sidebar width */
+          margin-left: 0px;
           flex: 1;
-          padding: 30px;
-          box-sizing: border-box;
+          padding: 36px;
+          max-width: 1400px;
         }
         .dashboard-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          margin-bottom: 30px;
-          border-bottom: 2px solid #e2e8f0;
-          padding-bottom: 15px;
+          margin-bottom: 32px;
+          background: #ffffff;
+          padding: 24px 30px;
+          border-radius: 16px;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.1);
+          border: 1px solid #f1f5f9;
         }
         .dashboard-header h1 {
           margin: 0;
-          color: #2c3e50;
-          font-size: 26px;
+          color: #0f172a;
+          font-size: 24px;
+          font-weight: 700;
+          letter-spacing: -0.5px;
         }
         .dashboard-header p {
-          margin: 5px 0 0 0;
-          color: #7f8c8d;
-          font-size: 14px;
+          margin: 4px 0 0 0;
+          color: #64748b;
+          font-size: 13px;
         }
-        .term-selector-wrapper {
+        .header-controls {
           display: flex;
+          gap: 12px;
           align-items: center;
-          gap: 10px;
         }
         .term-select {
-          padding: 8px 12px;
-          border-radius: 20px;
+          padding: 8px 16px;
+          border-radius: 10px;
           border: 1px solid #cbd5e1;
-          background: #ffffff;
+          background: #f8fafc;
           font-size: 13px;
-          color: #2c3e50;
-          font-weight: bold;
+          color: #0f172a;
+          font-weight: 600;
           cursor: pointer;
+          transition: all 0.2s;
+        }
+        .term-select:hover {
+          border-color: #94a3b8;
+        }
+        .year-badge {
+          background: #f1f5f9;
+          padding: 8px 16px;
+          border-radius: 10px;
+          font-size: 13px;
+          color: #475569;
+          font-weight: 600;
+          border: 1px solid #e2e8f0;
         }
         .stats-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
           gap: 20px;
-          margin-bottom: 30px;
+          margin-bottom: 32px;
         }
         .stat-card {
           background: #ffffff;
-          padding: 20px;
-          border-radius: 8px;
-          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-          border-left: 5px solid #3498db;
+          padding: 22px;
+          border-radius: 16px;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+          border: 1px solid #f1f5f9;
+          position: relative;
+          overflow: hidden;
+          transition: transform 0.2s, box-shadow 0.2s;
         }
-        .stat-card.warning {
-          border-left-color: #e74c3c;
+        .stat-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025);
         }
-        .stat-card.success {
-          border-left-color: #2ecc71;
+        .stat-card::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 4px;
+          height: 100%;
         }
-        .stat-card.info {
-          border-left-color: #f39c12;
-        }
-        .stat-card.primary {
-          border-left-color: #9b59b6;
-        }
+        .stat-card.primary::before { background: #6366f1; }
+        .stat-card.classes::before { background: #14b8a6; }
+        .stat-card.success::before { background: #10b981; }
+        .stat-card.warning::before { background: #f59e0b; }
+        .stat-card.info::before { background: #8b5cf6; }
+
         .stat-title {
           margin: 0;
-          font-size: 13px;
-          color: #7f8c8d;
+          font-size: 12px;
+          color: #64748b;
           text-transform: uppercase;
-          letter-spacing: 0.5px;
+          letter-spacing: 0.8px;
+          font-weight: 600;
         }
         .stat-value {
           margin: 10px 0 0 0;
-          font-size: 28px;
-          font-weight: bold;
-          color: #2c3e50;
+          font-size: 30px;
+          font-weight: 800;
+          color: #0f172a;
+          letter-spacing: -1px;
         }
         .content-section {
           background: #ffffff;
-          padding: 25px;
-          border-radius: 8px;
-          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-          margin-bottom: 25px;
+          padding: 28px;
+          border-radius: 16px;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+          border: 1px solid #f1f5f9;
+          margin-bottom: 28px;
         }
         .content-section h3 {
           margin-top: 0;
-          color: #2c3e50;
-          font-size: 18px;
-          margin-bottom: 15px;
+          color: #0f172a;
+          font-size: 17px;
+          font-weight: 700;
+          margin-bottom: 20px;
         }
         .visualization-container {
           display: flex;
           flex-direction: column;
-          gap: 15px;
+          gap: 20px;
         }
         .progress-label-row {
           display: flex;
           justify-content: space-between;
-          font-size: 14px;
-          font-weight: bold;
+          font-size: 13px;
+          font-weight: 600;
           color: #334155;
-          margin-bottom: 5px;
+          margin-bottom: 8px;
         }
         .progress-track {
           width: 100%;
-          background-color: #e2e8f0;
-          border-radius: 6px;
-          height: 16px;
+          background-color: #f1f5f9;
+          border-radius: 8px;
+          height: 12px;
           overflow: hidden;
         }
-        .progress-fill-success {
-          background-color: #2ecc71;
+        .progress-fill {
           height: 100%;
-          border-radius: 6px 0 0 6px;
-          transition: width 0.5s ease-in-out;
+          border-radius: 8px;
+          transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        .progress-fill-warning {
-          background-color: #e74c3c;
-          height: 100%;
-          border-radius: 6px 0 0 6px;
-          transition: width 0.5s ease-in-out;
-        }
-        .quick-actions {
+        .progress-fill-success { background: linear-gradient(90deg, #10b981, #34d399); }
+        .progress-fill-warning { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+
+        /* Bar Chart Styles */
+        .barchart-wrapper {
           display: flex;
+          justify-content: space-around;
+          align-items: flex-end;
+          height: 240px;
+          padding: 20px 10px 10px 10px;
+          border-bottom: 2px solid #e2e8f0;
           gap: 15px;
-          flex-wrap: wrap;
         }
-        .action-btn {
-          background: #34495e;
-          color: white;
-          padding: 10px 20px;
-          border: none;
-          border-radius: 5px;
-          cursor: pointer;
-          font-weight: bold;
-          text-decoration: none;
-          transition: background 0.2s;
-          display: inline-block;
+        .barchart-column {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          flex: 1;
+          height: 100%;
+          justify-content: flex-end;
         }
-        .action-btn:hover {
-          background: #2c3e50;
+        .barchart-bar {
+          width: 100%;
+          max-width: 50px;
+          border-radius: 8px 8px 0 0;
+          transition: height 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+          position: relative;
+          display: flex;
+          justify-content: center;
+          align-items: flex-start;
+          padding-top: 6px;
         }
-        .action-btn.danger {
-          background: #e74c3c;
+        .barchart-val {
+          font-size: 11px;
+          font-weight: 700;
+          color: #ffffff;
+          text-shadow: 0 1px 2px rgba(0,0,0,0.2);
         }
-        .action-btn.danger:hover {
-          background: #c0392b;
+        .barchart-label {
+          margin-top: 10px;
+          font-size: 12px;
+          font-weight: 600;
+          color: #64748b;
+          text-align: center;
+          white-space: nowrap;
+        }
+
+        .error-banner {
+          color: #991b1b;
+          margin-bottom: 24px;
+          background: #fef2f2;
+          padding: 14px 18px;
+          border-radius: 12px;
+          border: 1px solid #fecaca;
+          font-size: 13px;
+          font-weight: 500;
         }
       `}</style>
 
       <div className="dashboard-container">
-        {/* Imported Sidebar */}
         <DisciplineSidebar />
 
-        {/* Main Dashboard Panel */}
         <div className="main-content">
           <div className="dashboard-header">
             <div>
               <h1>Discipline Office Dashboard</h1>
-              <p>Karenge Adventist Secondary School - Management Portal</p>
+              <p>Karenge Adventist Secondary School • Management Portal</p>
             </div>
-            <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+            <div className="header-controls">
               <div className="term-selector-wrapper">
-                <label style={{ fontSize: '13px', color: '#2c3e50', fontWeight: 'bold' }}>Term:</label>
                 <select 
                   className="term-select"
                   value={selectedTerm} 
@@ -255,40 +321,37 @@ export default function DisciplineDashboard() {
                   <option value="Term 3">Term 3</option>
                 </select>
               </div>
-              <span style={{ background: '#e2e8f0', padding: '8px 15px', borderRadius: '20px', fontSize: '13px', color: '#2c3e50', fontWeight: 'bold' }}>
-                Academic Year: 2026
+              <span className="year-badge">
+                📅 2026
               </span>
             </div>
           </div>
 
           {error && (
-            <div style={{ color: 'red', marginBottom: '20px', background: '#fadbd8', padding: '10px', borderRadius: '5px' }}>
-              Error loading real-time dashboard records: {error}
+            <div className="error-banner">
+              ⚠️ Error loading real-time records: {error}
             </div>
           )}
 
           {/* Statistics Grid */}
           <div className="stats-grid">
-            <div className="stat-card">
-              <h4 className="stat-title">Total Registered Students</h4>
+            <div className="stat-card primary">
+              <h4 className="stat-title">Total Students</h4>
               <p className="stat-value">{loading ? '...' : totalStudents}</p>
             </div>
+            <div className="stat-card classes">
+              <h4 className="stat-title">Total Classes</h4>
+              <p className="stat-value">{loading ? '...' : totalClasses}</p>
+            </div>
             <div className="stat-card success">
-              <h4 className="stat-title">Checked Students ({selectedTerm})</h4>
+              <h4 className="stat-title">Fully Checked</h4>
               <p className="stat-value">{loading ? '...' : checkedStudentsCount}</p>
             </div>
             <div className="stat-card warning">
-              <h4 className="stat-title">Active Incidents</h4>
-              <p className="stat-value">3</p>
+              <h4 className="stat-title">Lacking Items</h4>
+              <p className="stat-value">{loading ? '...' : lackingStudentsCount}</p>
             </div>
-            <div className="stat-card info">
-              <h4 className="stat-title">Pending Actions</h4>
-              <p className="stat-value">1</p>
-            </div>
-            <div className="stat-card primary">
-              <h4 className="stat-title">Resolved Cases</h4>
-              <p className="stat-value">12</p>
-            </div>
+            
           </div>
 
           {/* Visual Analysis Analytics Panel */}
@@ -297,42 +360,59 @@ export default function DisciplineDashboard() {
             <div className="visualization-container">
               <div>
                 <div className="progress-label-row">
-                  <span>Fully Verified & Complete Materials</span>
-                  <span>{checkedStudentsCount} / {totalStudents} Students ({checkedPercentage}%)</span>
+                  <span>✨ Fully Verified & Complete</span>
+                  <span>{checkedStudentsCount} / {totalStudents} ({checkedPercentage}%)</span>
                 </div>
                 <div className="progress-track">
-                  <div className="progress-fill-success" style={{ width: `${loading ? 0 : checkedPercentage}%` }}></div>
+                  <div className="progress-fill progress-fill-success" style={{ width: `${loading ? 0 : checkedPercentage}%` }}></div>
                 </div>
               </div>
 
-              <div style={{ marginTop: '10px' }}>
+              <div>
                 <div className="progress-label-row">
-                  <span>Pending / Lacking Materials</span>
-                  <span>{lackingStudentsCount} / {totalStudents} Students ({lackingPercentage}%)</span>
+                  <span>⚠️ Lacking Materials</span>
+                  <span>{lackingStudentsCount} / {totalStudents} ({lackingPercentage}%)</span>
                 </div>
                 <div className="progress-track">
-                  <div className="progress-fill-warning" style={{ width: `${loading ? 0 : lackingPercentage}%` }}></div>
+                  <div className="progress-fill progress-fill-warning" style={{ width: `${loading ? 0 : lackingPercentage}%` }}></div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Quick Actions Panel */}
+          {/* Bar Chart Panel */}
           <div className="content-section">
-            <h3>Quick Actions</h3>
-            <div className="quick-actions">
-              <a href="/discipline/add-student" className="action-btn">
-                ➕ Register New Student
-              </a>
-              <a href="/discipline/incidents" className="action-btn danger">
-                ⚠️ Record New Incident
-              </a>
-              <a href="/Studentlist" className="action-btn">
-                🎓 View Student Directory
-              </a>
-              <a href="/discipline/reports" className="action-btn">
-                📋 Generate Report
-              </a>
+            <h3>Student Verification Status Overview</h3>
+            <div className="barchart-wrapper">
+              <div className="barchart-column">
+                <div 
+                  className="barchart-bar" 
+                  style={{ height: getBarHeight(totalStudents), background: '#6366f1' }}
+                >
+                  <span className="barchart-val">{loading ? '' : totalStudents}</span>
+                </div>
+                <span className="barchart-label">Total Students</span>
+              </div>
+
+              <div className="barchart-column">
+                <div 
+                  className="barchart-bar" 
+                  style={{ height: getBarHeight(checkedStudentsCount), background: '#10b981' }}
+                >
+                  <span className="barchart-val">{loading ? '' : checkedStudentsCount}</span>
+                </div>
+                <span className="barchart-label">Fully Checked</span>
+              </div>
+
+              <div className="barchart-column">
+                <div 
+                  className="barchart-bar" 
+                  style={{ height: getBarHeight(lackingStudentsCount), background: '#f59e0b' }}
+                >
+                  <span className="barchart-val">{loading ? '' : lackingStudentsCount}</span>
+                </div>
+                <span className="barchart-label">Lacking</span>
+              </div>
             </div>
           </div>
         </div>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Sidebar from './DisciplineSidebar';
 
 function MaterialsList() {
     const [materials, setMaterials] = useState([]);
@@ -12,14 +13,14 @@ function MaterialsList() {
     const [minimum, setMinimum] = useState('');
     
     // Exception Rules State
-    const [targetGroup, setTargetGroup] = useState('All'); // 'All', 'Girls Only', 'Boys Only'
-    const [levelType, setLevelType] = useState('General'); // 'General', 'Level Dependent'
+    const [targetGroup, setTargetGroup] = useState('All'); 
+    const [levelType, setLevelType] = useState('General'); 
     const [levelSpecificMins, setLevelSpecificMins] = useState({ oLevel: '', aLevel: '' });
-    const [frequency, setFrequency] = useState('Per Term'); // 'Per Term', 'Once a Year (Carry Forward)'
+    const [frequency, setFrequency] = useState('Per Term'); 
 
-    // Pagination state
+    // Pagination state (Updated to 10 items per page)
     const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 5;
+    const itemsPerPage = 10;
 
     // Fetch materials on component mount
     useEffect(() => {
@@ -48,7 +49,6 @@ function MaterialsList() {
             setTargetGroup(material.targetGroup || 'All');
             setLevelType(material.levelType || 'General');
             setLevelSpecificMins(material.levelSpecificMins || { oLevel: '', aLevel: '' });
-            // Directly map the fetched frequency or fallback safely without overwriting user-specified inputs
             setFrequency(material.frequency || 'Per Term');
         } else {
             setEditId(null);
@@ -74,7 +74,7 @@ function MaterialsList() {
                 targetGroup,
                 levelType,
                 levelSpecificMins: levelType === 'Level Dependent' ? levelSpecificMins : null,
-                frequency // Saves the exact frequency selected by the user
+                frequency
             };
 
             const response = await fetch(url, {
@@ -93,7 +93,7 @@ function MaterialsList() {
     };
 
     const handleDeleteMaterial = async (id) => {
-        if (!window.confirm('Are you sure you want to delete this material?')) return;
+        if (!window.confirm('Are you sure you want to delete this material configuration?')) return;
         try {
             const response = await fetch(`http://localhost:5000/api/v1/delete/${id}`, { method: 'DELETE' });
             if (!response.ok) throw new Error('Failed to delete material');
@@ -111,344 +111,473 @@ function MaterialsList() {
 
     const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
-    if (loading) return <div className="loading-state">Loading materials inventory...</div>;
-    if (error) return <div className="error-state">Error: {error}</div>;
+    if (loading) return (
+        <div className="layout-flex-wrapper" style={{ display: 'flex', minHeight: '100vh', background: '#f8fafc' }}>
+            <Sidebar />
+            <div className="state-container" style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+                <div className="spinner"></div>
+                <p>Loading materials inventory...</p>
+            </div>
+        </div>
+    );
+    
+    if (error) return (
+        <div className="layout-flex-wrapper" style={{ display: 'flex', minHeight: '100vh', background: '#f8fafc' }}>
+            <Sidebar />
+            <div className="state-container error-state" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                <p>⚠️ Error: {error}</p>
+            </div>
+        </div>
+    );
 
     return (
-        <>
-            <style>{`
-                body {
-                    margin: 0;
-                    background-color: #f4f6f9;
-                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                }
-                .materials-container {
-                    padding: 30px;
-                    max-width: 1050px;
-                    margin: 40px auto;
-                    background: #ffffff;
-                    border-radius: 10px;
-                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-                }
-                .header-flex {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    margin-bottom: 25px;
-                    border-bottom: 2px solid #edf2f7;
-                    padding-bottom: 15px;
-                }
-                .header-flex h2 {
-                    margin: 0;
-                    color: #2c3e50;
-                    font-size: 22px;
-                }
-                .add-btn {
-                    background-color: #2ecc71;
-                    color: white;
-                    padding: 10px 18px;
-                    border: none;
-                    cursor: pointer;
-                    border-radius: 6px;
-                    font-weight: 600;
-                    font-size: 14px;
-                    transition: background 0.2s;
-                }
-                .add-btn:hover {
-                    background-color: #27ae60;
-                }
-                .styled-table {
-                    width: 100%;
-                    border-collapse: collapse;
-                    text-align: left;
-                    overflow: hidden;
-                    border-radius: 6px;
-                }
-                .styled-table thead tr {
-                    background-color: #34495e;
-                    color: #ffffff;
-                    text-align: left;
-                    font-weight: bold;
-                }
-                .styled-table th, .styled-table td {
-                    padding: 14px 16px;
-                }
-                .styled-table tbody tr {
-                    border-bottom: 1px solid #e2e8f0;
-                    transition: background 0.15s;
-                }
-                .styled-table tbody tr:hover {
-                    background-color: #f8fafc;
-                }
-                .styled-table tbody tr:last-of-type {
-                    border-bottom: 2px solid #34495e;
-                }
-                .badge {
-                    display: inline-block;
-                    padding: 3px 8px;
-                    border-radius: 12px;
-                    font-size: 11px;
-                    font-weight: 700;
-                    text-transform: uppercase;
-                }
-                .badge-target { background: #e0f2fe; color: #0369a1; }
-                .badge-level { background: #fef3c7; color: #b45309; }
-                .badge-freq { background: #f3e8ff; color: #6b21a8; }
-                
-                .action-btn-edit {
-                    background-color: #3498db;
-                    color: white;
-                    border: none;
-                    padding: 6px 12px;
-                    border-radius: 4px;
-                    cursor: pointer;
-                    font-weight: 600;
-                    margin-right: 8px;
-                    transition: background 0.2s;
-                }
-                .action-btn-edit:hover {
-                    background-color: #2980b9;
-                }
-                .action-btn-delete {
-                    background-color: #e74c3c;
-                    color: white;
-                    border: none;
-                    padding: 6px 12px;
-                    border-radius: 4px;
-                    cursor: pointer;
-                    font-weight: 600;
-                    transition: background 0.2s;
-                }
-                .action-btn-delete:hover {
-                    background-color: #c0392b;
-                }
-                .empty-state {
-                    text-align: center;
-                    color: #7f8c8d;
-                    padding: 30px;
-                    font-style: italic;
-                }
-                .pagination {
-                    display: flex;
-                    justify-content: center;
-                    align-items: center;
-                    gap: 6px;
-                    margin-top: 25px;
-                }
-                .page-btn {
-                    background-color: #ffffff;
-                    color: #334155;
-                    border: 1px solid #cbd5e1;
-                    padding: 6px 12px;
-                    border-radius: 4px;
-                    cursor: pointer;
-                    font-weight: 600;
-                    font-size: 13px;
-                    transition: all 0.2s;
-                }
-                .page-btn:hover {
-                    background-color: #f1f5f9;
-                    border-color: #94a3b8;
-                }
-                .page-btn.active {
-                    background-color: #34495e;
-                    color: white;
-                    border-color: #34495e;
-                }
-                .page-btn:disabled {
-                    background-color: #f8fafc;
-                    color: #cbd5e1;
-                    border-color: #e2e8f0;
-                    cursor: not-allowed;
-                }
-                .modal-overlay {
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    width: 100%;
-                    height: 100%;
-                    background-color: rgba(0, 0, 0, 0.5);
-                    display: flex;
-                    justify-content: center;
-                    align-items: center;
-                    z-index: 1000;
-                    backdrop-filter: blur(2px);
-                }
-                .modal-card {
-                    background: white;
-                    padding: 25px;
-                    border-radius: 8px;
-                    width: 480px;
-                    max-height: 90vh;
-                    overflow-y: auto;
-                    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-                }
-                .modal-card h3 {
-                    margin-top: 0;
-                    color: #2c3e50;
-                    font-size: 18px;
-                    margin-bottom: 20px;
-                    border-bottom: 1px solid #edf2f7;
-                    padding-bottom: 10px;
-                }
-                .form-group {
-                    margin-bottom: 15px;
-                }
-                .form-group label {
-                    display: block;
-                    margin-bottom: 6px;
-                    color: #4a5568;
-                    font-weight: 600;
-                    font-size: 13px;
-                }
-                .form-group input, .form-group select {
-                    width: 100%;
-                    padding: 10px;
-                    border: 1px solid #cbd5e1;
-                    border-radius: 4px;
-                    box-sizing: border-box;
-                    font-size: 14px;
-                }
-                .form-group input:focus, .form-group select:focus {
-                    outline: none;
-                    border-color: #3498db;
-                    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.15);
-                }
-                .row-group {
-                    display: flex;
-                    gap: 10px;
-                }
-                .modal-actions {
-                    display: flex;
-                    justify-content: flex-end;
-                    gap: 10px;
-                    margin-top: 20px;
-                }
-                .btn-cancel {
-                    background-color: #e2e8f0;
-                    color: #475569;
-                    border: none;
-                    padding: 9px 15px;
-                    border-radius: 4px;
-                    cursor: pointer;
-                    font-weight: 600;
-                }
-                .btn-cancel:hover {
-                    background-color: #cbd5e1;
-                }
-                .btn-save {
-                    background-color: #3498db;
-                    color: white;
-                    border: none;
-                    padding: 9px 18px;
-                    border-radius: 4px;
-                    cursor: pointer;
-                    font-weight: 600;
-                }
-                .btn-save:hover {
-                    background-color: #2980b9;
-                }
-                .loading-state, .error-state {
-                    padding: 40px;
-                    text-align: center;
-                    font-size: 16px;
-                    font-weight: bold;
-                }
-                .error-state {
-                    color: #e74c3c;
-                }
-            `}</style>
+        <div style={{ display: 'flex', minHeight: '100vh', background: '#f8fafc' }}>
+            <Sidebar />
+            
+            <div style={{ flex: 1, padding: '40px 20px', fontFamily: "'Inter', sans-serif" }}>
+                <style>{`
+                    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-            <div className="materials-container">
-                <div className="header-flex">
-                    <h2>Materials Management Portal</h2>
-                    <button onClick={() => handleOpenModal()} className="add-btn">
-                        + Add New Material
-                    </button>
-                </div>
+                    .materials-container {
+                        max-width: 1200px;
+                        margin: 0 auto;
+                        background: #ffffff;
+                        border-radius: 12px;
+                        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+                        overflow: hidden;
+                        border: 1px solid #e2e8f0;
+                    }
 
-                <table className="styled-table">
-                    <thead>
-                        <tr>
-                            <th>Material Name</th>
-                            <th>Minimum Required</th>
-                            <th>Target Group</th>
-                            <th>Level/Frequency Rules</th>
-                            <th style={{ textAlign: 'center' }}>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {currentMaterials.length === 0 ? (
-                            <tr>
-                                <td colSpan="5" className="empty-state">No materials found in configuration.</td>
-                            </tr>
-                        ) : (
-                            currentMaterials.map((item) => (
-                                <tr key={item.id}>
-                                    <td style={{ fontWeight: '600', color: '#2d3748' }}>{item.material}</td>
-                                    <td>
-                                        {item.levelType === 'Level Dependent' ? (
-                                            <span style={{ fontSize: '13px' }}>
-                                                O-L: <strong>{item.levelSpecificMins?.oLevel || 0}</strong> | A-L: <strong>{item.levelSpecificMins?.aLevel || 0}</strong>
-                                            </span>
-                                        ) : (
-                                            item.minimum
-                                        )}
-                                    </td>
-                                    <td>
-                                        <span className="badge badge-target">{item.targetGroup || 'All'}</span>
-                                    </td>
-                                    <td>
-                                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                                            <span className="badge badge-level">{item.levelType || 'General'}</span>
-                                            <span className="badge badge-freq">{item.frequency || 'Per Term'}</span>
-                                        </div>
-                                    </td>
-                                    <td style={{ textAlign: 'center' }}>
-                                        <button onClick={() => handleOpenModal(item)} className="action-btn-edit">Edit</button>
-                                        <button onClick={() => handleDeleteMaterial(item.id)} className="action-btn-delete">Delete</button>
-                                    </td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
+                    .header-flex {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        padding: 24px 32px;
+                        background: #ffffff;
+                        border-bottom: 1px solid #e2e8f0;
+                    }
 
-                {/* Pagination Controls */}
-                {totalPages > 1 && (
-                    <div className="pagination">
-                        <button 
-                            className="page-btn" 
-                            onClick={() => paginate(currentPage - 1)} 
-                            disabled={currentPage === 1}
-                        >
-                            &laquo; Prev
-                        </button>
+                    .header-title h2 {
+                        margin: 0;
+                        color: #0f172a;
+                        font-size: 20px;
+                        font-weight: 700;
+                        letter-spacing: -0.025em;
+                    }
 
-                        {[...Array(totalPages)].map((_, index) => {
-                            const pageNum = index + 1;
-                            return (
-                                <button
-                                    key={pageNum}
-                                    className={`page-btn ${currentPage === pageNum ? 'active' : ''}`}
-                                    onClick={() => paginate(pageNum)}
-                                >
-                                    {pageNum}
-                                </button>
-                            );
-                        })}
+                    .header-title p {
+                        margin: 4px 0 0 0;
+                        color: #64748b;
+                        font-size: 13px;
+                    }
 
-                        <button 
-                            className="page-btn" 
-                            onClick={() => paginate(currentPage + 1)} 
-                            disabled={currentPage === totalPages}
-                        >
-                            Next &raquo;
+                    .add-btn {
+                        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+                        color: white;
+                        padding: 10px 18px;
+                        border: none;
+                        cursor: pointer;
+                        border-radius: 8px;
+                        font-weight: 600;
+                        font-size: 14px;
+                        box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
+                        transition: all 0.2s ease;
+                    }
+
+                    .add-btn:hover {
+                        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+                        box-shadow: 0 6px 8px -1px rgba(37, 99, 235, 0.3);
+                        transform: translateY(-1px);
+                    }
+
+                    .table-responsive {
+                        overflow-x: auto;
+                    }
+
+                    .styled-table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        text-align: left;
+                    }
+
+                    .styled-table thead tr {
+                        background-color: #f1f5f9;
+                        color: #475569;
+                        font-size: 12px;
+                        font-weight: 600;
+                        text-transform: uppercase;
+                        letter-spacing: 0.05em;
+                    }
+
+                    .styled-table th, .styled-table td {
+                        padding: 16px 24px;
+                    }
+
+                    .styled-table tbody tr {
+                        border-bottom: 1px solid #f1f5f9;
+                        transition: background-color 0.15s ease;
+                    }
+
+                    .styled-table tbody tr:hover {
+                        background-color: #f8fafc;
+                    }
+
+                    .badge {
+                        display: inline-flex;
+                        align-items: center;
+                        padding: 4px 10px;
+                        border-radius: 9999px;
+                        font-size: 11px;
+                        font-weight: 600;
+                        letter-spacing: 0.025em;
+                    }
+
+                    .badge-target { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+                    .badge-level { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
+                    .badge-freq { background: #fdf4ff; color: #701a75; border: 1px solid #f5d0fe; }
+
+                    .action-btns {
+                        display: flex;
+                        gap: 8px;
+                        justify-content: flex-end;
+                    }
+
+                    .action-btn-edit {
+                        background-color: #eff6ff;
+                        color: #2563eb;
+                        border: 1px solid #bfdbfe;
+                        padding: 6px 12px;
+                        border-radius: 6px;
+                        cursor: pointer;
+                        font-weight: 600;
+                        font-size: 12px;
+                        transition: all 0.2s;
+                    }
+
+                    .action-btn-edit:hover {
+                        background-color: #dbeafe;
+                    }
+
+                    .action-btn-delete {
+                        background-color: #fef2f2;
+                        color: #dc2626;
+                        border: 1px solid #fecaca;
+                        padding: 6px 12px;
+                        border-radius: 6px;
+                        cursor: pointer;
+                        font-weight: 600;
+                        font-size: 12px;
+                        transition: all 0.2s;
+                    }
+
+                    .action-btn-delete:hover {
+                        background-color: #fee2e2;
+                    }
+
+                    .empty-state {
+                        text-align: center;
+                        color: #94a3b8;
+                        padding: 48px;
+                        font-style: italic;
+                        font-size: 14px;
+                    }
+
+                    .pagination-footer {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        padding: 20px 32px;
+                        background: #ffffff;
+                        border-top: 1px solid #e2e8f0;
+                    }
+
+                    .pagination-info {
+                        font-size: 13px;
+                        color: #64748b;
+                    }
+
+                    .pagination {
+                        display: flex;
+                        align-items: center;
+                        gap: 4px;
+                    }
+
+                    .page-btn {
+                        background-color: #ffffff;
+                        color: #475569;
+                        border: 1px solid #cbd5e1;
+                        padding: 6px 12px;
+                        border-radius: 6px;
+                        cursor: pointer;
+                        font-weight: 500;
+                        font-size: 13px;
+                        transition: all 0.2s;
+                    }
+
+                    .page-btn:hover:not(:disabled) {
+                        background-color: #f1f5f9;
+                        border-color: #94a3b8;
+                        color: #0f172a;
+                    }
+
+                    .page-btn.active {
+                        background-color: #2563eb;
+                        color: white;
+                        border-color: #2563eb;
+                    }
+
+                    .page-btn:disabled {
+                        background-color: #f8fafc;
+                        color: #cbd5e1;
+                        border-color: #e2e8f0;
+                        cursor: not-allowed;
+                    }
+
+                    .modal-overlay {
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        background-color: rgba(15, 23, 42, 0.6);
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        z-index: 1000;
+                        backdrop-filter: blur(4px);
+                        animation: fadeIn 0.2s ease-out;
+                    }
+
+                    .modal-card {
+                        background: white;
+                        padding: 32px;
+                        border-radius: 16px;
+                        width: 100%;
+                        max-width: 500px;
+                        max-height: 90vh;
+                        overflow-y: auto;
+                        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+                        animation: slideUp 0.2s ease-out;
+                    }
+
+                    .modal-card h3 {
+                        margin-top: 0;
+                        color: #0f172a;
+                        font-size: 18px;
+                        font-weight: 700;
+                        margin-bottom: 24px;
+                        padding-bottom: 12px;
+                        border-bottom: 1px solid #f1f5f9;
+                    }
+
+                    .form-group {
+                        margin-bottom: 20px;
+                    }
+
+                    .form-group label {
+                        display: block;
+                        margin-bottom: 8px;
+                        color: #334155;
+                        font-weight: 600;
+                        font-size: 13px;
+                    }
+
+                    .form-group input, .form-group select {
+                        width: 100%;
+                        padding: 10px 14px;
+                        border: 1px solid #cbd5e1;
+                        border-radius: 8px;
+                        box-sizing: border-box;
+                        font-size: 14px;
+                        color: #0f172a;
+                        background-color: #f8fafc;
+                        transition: all 0.2s;
+                    }
+
+                    .form-group input:focus, .form-group select:focus {
+                        outline: none;
+                        background-color: #ffffff;
+                        border-color: #3b82f6;
+                        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+                    }
+
+                    .row-group {
+                        display: flex;
+                        gap: 16px;
+                    }
+
+                    .modal-actions {
+                        display: flex;
+                        justify-content: flex-end;
+                        gap: 12px;
+                        margin-top: 32px;
+                        padding-top: 16px;
+                        border-top: 1px solid #f1f5f9;
+                    }
+
+                    .btn-cancel {
+                        background-color: #f1f5f9;
+                        color: #475569;
+                        border: none;
+                        padding: 10px 18px;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        font-weight: 600;
+                        font-size: 14px;
+                        transition: background 0.2s;
+                    }
+
+                    .btn-cancel:hover {
+                        background-color: #e2e8f0;
+                    }
+
+                    .btn-save {
+                        background-color: #2563eb;
+                        color: white;
+                        border: none;
+                        padding: 10px 20px;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        font-weight: 600;
+                        font-size: 14px;
+                        box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
+                        transition: background 0.2s;
+                    }
+
+                    .btn-save:hover {
+                        background-color: #1d4ed8;
+                    }
+
+                    .spinner {
+                        border: 3px solid #f3f3f3;
+                        border-top: 3px solid #3b82f6;
+                        border-radius: 50%;
+                        width: 32px;
+                        height: 32px;
+                        animation: spin 1s linear infinite;
+                        margin: 0 auto 16px auto;
+                    }
+
+                    @keyframes spin {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                    }
+
+                    @keyframes fadeIn {
+                        from { opacity: 0; }
+                        to { opacity: 1; }
+                    }
+
+                    @keyframes slideUp {
+                        from { transform: translateY(10px); opacity: 0; }
+                        to { transform: translateY(0); opacity: 1; }
+                    }
+                `}</style>
+
+                <div className="materials-container">
+                    <div className="header-flex">
+                        <div className="header-title">
+                            <h2>Materials Management Portal</h2>
+                            <p>Configure requirements, gender criteria, level dependencies, and frequency rules.</p>
+                        </div>
+                        <button onClick={() => handleOpenModal()} className="add-btn">
+                            + Add New Material
                         </button>
                     </div>
-                )}
 
-                {/* Modal for Add / Edit with Rule Exception fields */}
+                    <div className="table-responsive">
+                        <table className="styled-table">
+                            <thead>
+                                <tr>
+                                    <th>Material Name</th>
+                                    <th>Minimum Required</th>
+                                    <th>Target Group</th>
+                                    <th>Level & Frequency Rules</th>
+                                    <th style={{ textAlign: 'right' }}>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {currentMaterials.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="5" className="empty-state">No materials found in system configuration.</td>
+                                    </tr>
+                                ) : (
+                                    currentMaterials.map((item) => (
+                                        <tr key={item.id}>
+                                            <td style={{ fontWeight: '600', color: '#0f172a' }}>{item.material}</td>
+                                            <td>
+                                                {item.levelType === 'Level Dependent' ? (
+                                                    <span style={{ fontSize: '13px', color: '#334155' }}>
+                                                        O-L: <strong>{item.levelSpecificMins?.oLevel || 0}</strong> &nbsp;|&nbsp; A-L: <strong>{item.levelSpecificMins?.aLevel || 0}</strong>
+                                                    </span>
+                                                ) : (
+                                                    <span style={{ color: '#334155', fontWeight: '500' }}>{item.minimum}</span>
+                                                )}
+                                            </td>
+                                            <td>
+                                                <span className="badge badge-target">{item.targetGroup || 'All'}</span>
+                                            </td>
+                                            <td>
+                                                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                                    <span className="badge badge-level">{item.levelType || 'General'}</span>
+                                                    <span className="badge badge-freq">{item.frequency || 'Per Term'}</span>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div className="action-btns">
+                                                    <button onClick={() => handleOpenModal(item)} className="action-btn-edit">Edit</button>
+                                                    <button onClick={() => handleDeleteMaterial(item.id)} className="action-btn-delete">Delete</button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {materials.length > 0 && (
+                        <div className="pagination-footer">
+                            <div className="pagination-info">
+                                Showing <strong>{indexOfFirstItem + 1}</strong> to <strong>{Math.min(indexOfLastItem, materials.length)}</strong> of <strong>{materials.length}</strong> entries
+                            </div>
+                            
+                            {totalPages > 1 && (
+                                <div className="pagination">
+                                    <button 
+                                        className="page-btn" 
+                                        onClick={() => paginate(currentPage - 1)} 
+                                        disabled={currentPage === 1}
+                                    >
+                                        &laquo; Prev
+                                    </button>
+
+                                    {[...Array(totalPages)].map((_, index) => {
+                                        const pageNum = index + 1;
+                                        return (
+                                            <button
+                                                key={pageNum}
+                                                className={`page-btn ${currentPage === pageNum ? 'active' : ''}`}
+                                                onClick={() => paginate(pageNum)}
+                                            >
+                                                {pageNum}
+                                            </button>
+                                        );
+                                    })}
+
+                                    <button 
+                                        className="page-btn" 
+                                        onClick={() => paginate(currentPage + 1)} 
+                                        disabled={currentPage === totalPages}
+                                    >
+                                        Next &raquo;
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+
                 {showModal && (
                     <div className="modal-overlay">
                         <div className="modal-card">
@@ -460,7 +589,7 @@ function MaterialsList() {
                                         type="text" 
                                         value={materialName} 
                                         onChange={(e) => setMaterialName(e.target.value)} 
-                                        placeholder="e.g. Notebooks, Lame, Mattress"
+                                        placeholder="e.g. Notebooks, Ream of Paper, Mattress"
                                         required 
                                     />
                                 </div>
@@ -469,7 +598,7 @@ function MaterialsList() {
                                     <label>Target Group (Gender Exception):</label>
                                     <select value={targetGroup} onChange={(e) => setTargetGroup(e.target.value)}>
                                         <option value="All">All Students</option>
-                                        <option value="Girls Only">Girls Only (e.g. Nicker pegs & pads)</option>
+                                        <option value="Girls Only">Girls Only (e.g. Sanitary pads)</option>
                                         <option value="Boys Only">Boys Only</option>
                                     </select>
                                 </div>
@@ -477,7 +606,7 @@ function MaterialsList() {
                                 <div className="form-group">
                                     <label>Level Type (O'Level vs A'Level Exception):</label>
                                     <select value={levelType} onChange={(e) => setLevelType(e.target.value)}>
-                                        <option value="General">General (Same for all levels)</option>
+                                        <option value="General">General (Same minimum across all levels)</option>
                                         <option value="Level Dependent">Level Dependent (Different mins for O/A Level)</option>
                                     </select>
                                 </div>
@@ -535,7 +664,7 @@ function MaterialsList() {
                     </div>
                 )}
             </div>
-        </>
+        </div>
     );
 }
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Sidebar from './DisciplineSidebar';
 
 function AllStudentsMaterialsView() {
     const [students, setStudents] = useState([]);
@@ -63,6 +64,7 @@ function AllStudentsMaterialsView() {
 
     return (
         <>
+        <Sidebar />
             <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 
