@@ -11,10 +11,26 @@ const authRoutes = require('./routes/authRoutes');
 
 const app = express();
 
+// Allowed frontend origins for production and local development
+const allowedOrigins = [
+    'http://localhost:3000',
+    'https://kass-checking.vercel.app'
+];
+
 app.use(cors({
-    origin: 'http://localhost:3000', // your frontend's exact origin
-    credentials: true,               // allows the httpOnly cookie to be sent/received
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps, Postman, or server-to-server curl requests)
+        if (!origin) return callback(null, true);
+        
+        if (allowedOrigins.indexOf(origin) === -1) {
+            const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+            return callback(new Error(msg), false);
+        }
+        return callback(null, true);
+    },
+    credentials: true,                     // allows cookies/authorization headers to be sent
 }));
+
 app.use(cookieParser());
 app.use(express.json());
 
