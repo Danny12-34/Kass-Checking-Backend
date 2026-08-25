@@ -19,25 +19,10 @@ exports.getStudentsWithMaterials = async (req, res) => {
     }
 };
 
-// UPDATE: Update or insert a specific material record row (present_material count)
-// checked_by / checked_by_name are resolved server-side from the authenticated
-// session (req.userId) — never trust a value sent by the client, since that
-// could be spoofed to attribute a check to someone else.
+// UPDATE: Update or insert a specific material record row (accepting checked_by from frontend)
 exports.updateMaterialCheck = async (req, res) => {
     try {
-        const { student_id, term, material_name, minimum, present_material } = req.body;
-
-        if (!req.userId) {
-            return res.status(401).json({ error: 'Not authenticated' });
-        }
-
-        const { data: userRow, error: userErr } = await supabase
-            .from('users')
-            .select('full_name')
-            .eq('id', req.userId)
-            .single();
-
-        if (userErr) throw userErr;
+        const { student_id, term, material_name, minimum, present_material, checked_by } = req.body;
 
         const { data, error } = await supabase
             .from('material_checks')
@@ -48,8 +33,8 @@ exports.updateMaterialCheck = async (req, res) => {
                 material_name,
                 minimum,
                 present_material,
-                checked_by: req.userId,
-                checked_by_name: userRow?.full_name || 'Unknown',
+                checked_by: checked_by || 'Administrator',
+                checked_by_name: checked_by || 'Administrator',
                 checked_at: new Date(),
                 updated_at: new Date()
             }, { onConflict: ['student_id', 'term', 'material_name'] })
