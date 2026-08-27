@@ -15,6 +15,7 @@ exports.getStudentsWithMaterials = async (req, res) => {
         if (error) throw error;
         res.status(200).json(data);
     } catch (err) {
+        console.error('Get Students Error:', err.message);
         res.status(500).json({ error: err.message });
     }
 };
@@ -26,29 +27,33 @@ exports.updateMaterialCheck = async (req, res) => {
         
         const checkerName = checked_by_name || 'Danny niyitanga';
 
+        // Explicitly format payload to match table columns safely
+        const payload = {
+            student_id,
+            academic_year: '2026-2027',
+            term: term || 'Term 1',
+            material_name,
+            minimum: Number(minimum) || 0,
+            present_material: Number(present_material) || 0,
+            checked_by_name: checkerName,
+            checked_by: checkerName,
+            checked_at: new Date(),
+            updated_at: new Date()
+        };
+
         const { data, error } = await supabase
             .from('material_checks')
-            .upsert({
-                student_id,
-                academic_year: '2026-2027',
-                term,
-                material_name,
-                minimum,
-                present_material,
-                checked_by_name: checkerName,
-                checked_by: checkerName,
-                checked_at: new Date(),
-                updated_at: new Date()
-            }, { onConflict: ['student_id', 'term', 'material_name'] })
+            .upsert(payload, { onConflict: ['student_id', 'term', 'material_name'] })
             .select();
 
         if (error) {
-            console.error('Supabase Upsert Error:', error);
-            throw error;
+            console.error('Supabase Upsert Detailed Error:', JSON.stringify(error, null, 2));
+            return res.status(500).json({ error: error.message || 'Database upsert failed' });
         }
         
-        res.status(200).json({ message: 'Material updated successfully', data });
+        return res.status(200).json({ message: 'Material updated successfully', data });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error('Server Catch Error:', err.message);
+        return res.status(500).json({ error: err.message });
     }
 };
