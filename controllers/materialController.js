@@ -22,7 +22,7 @@ exports.getStudentsWithMaterials = async (req, res) => {
 // UPDATE: Update or insert a specific material record row (present_material count)
 exports.updateMaterialCheck = async (req, res) => {
     try {
-        const { student_id, term, class_id, material_name, minimum, present_material, checked_by_name } = req.body;
+        const { student_id, term, material_name, minimum, present_material, checked_by_name } = req.body;
         
         const checkerName = checked_by_name || 'Danny niyitanga';
 
@@ -30,7 +30,6 @@ exports.updateMaterialCheck = async (req, res) => {
             .from('material_checks')
             .upsert({
                 student_id,
-                class_id,
                 academic_year: '2026-2027',
                 term,
                 material_name,
