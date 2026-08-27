@@ -27,7 +27,8 @@ exports.updateMaterialCheck = async (req, res) => {
         
         const checkerName = checked_by_name || 'Danny niyitanga';
 
-        // Explicitly format payload to match table columns safely
+        // Payload excludes 'checked_by' (which expects a UUID) to prevent type mismatch errors, 
+        // relying strictly on 'checked_by_name' for the text string.
         const payload = {
             student_id,
             academic_year: '2026-2027',
@@ -36,7 +37,6 @@ exports.updateMaterialCheck = async (req, res) => {
             minimum: Number(minimum) || 0,
             present_material: Number(present_material) || 0,
             checked_by_name: checkerName,
-            checked_by: checkerName,
             checked_at: new Date(),
             updated_at: new Date()
         };
