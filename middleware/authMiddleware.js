@@ -1,21 +1,37 @@
-const jwt = require('jsonwebtoken');
+const supabase = require('../db');
 
-const JWT_SECRET = process.env.JWT_SECRET;
 const COOKIE_NAME = 'session_token';
 
-exports.authenticate = (req, res, next) => {
-    const token = req.cookies?.[COOKIE_NAME];
-
-    if (!token) {
-        return res.status(401).json({ error: 'Not authenticated' });
-    }
-
+const authenticate = async (req, res, next) => {
     try {
-        const decoded = jwt.verify(token, JWT_SECRET);
-        req.userId = decoded.id;
-        req.userRole = decoded.role;
+        const sessionId = req.cookies[COOKIE_NAME];
+        if (!sessionId) {
+            return res.status(401).json({ error: 'Not authenticated' });
+        }
+
+        // Query the database sessions table
+        const { data: session, error } = await supabase
+            .from('sessions')
+            .select('user_id, expires_at')
+            .eq('id', sessionId)
+            .single();
+
+        if (error || !session) {
+            return res.status(401).json({ error: 'Invalid session' });
+        }
+
+        // Check if session has expired
+        if (new Date() > new Date(session.expires_at)) {
+            await supabase.from('sessions').delete().eq('id', sessionId);
+            return res.status(401).json({ error: 'Session expired' });
+        }
+
+        // Attach user ID (UUID) to request object for downstream controllers
+        req.userId = session.user_id;
         next();
     } catch (err) {
-        return res.status(401).json({ error: 'Session expired or invalid, please log in again' });
+        return res.status(500).json({ error: err.message });
     }
 };
+
+module.exports = { authenticate };

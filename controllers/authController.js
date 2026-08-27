@@ -1,28 +1,25 @@
 const supabase = require('../db');
 const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 
-const JWT_SECRET = process.env.JWT_SECRET;
 const COOKIE_NAME = 'session_token';
 
 const cookieOptions = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production', // requires HTTPS in prod
-    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'none', // Required for cross-site Vercel frontend/backend setups
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
 };
 
-// CREATE: Sign up a new user (no signup code required)
-// body: { full_name, email, password, role }  -> role optional, defaults to 'displineofficer'
+// CREATE: Sign up a new user
 exports.signup = async (req, res) => {
     try {
         const { full_name, email, password, role = 'displineofficer' } = req.body;
 
         if (!full_name || !email || !password) {
-            return res.status(400).json({ error: 'full_name, email and password are all required' });
+            return res.status(400).json({ error: 'full_name, email and password are required' });
         }
 
-        // Make sure the email isn't already registered
         const { data: existingUser } = await supabase
             .from('users')
             .select('id')
@@ -33,7 +30,6 @@ exports.signup = async (req, res) => {
             return res.status(409).json({ error: 'An account with this email already exists' });
         }
 
-        // Hash the password and create the user
         const hashedPassword = await bcrypt.hash(password, 10);
 
         const { data: newUser, error: insertError } = await supabase
@@ -55,8 +51,7 @@ exports.signup = async (req, res) => {
     }
 };
 
-// LOGIN: Verify credentials and issue an httpOnly JWT cookie
-// body: { email, password }
+// LOGIN: Verify credentials, create a database session, and issue an httpOnly cookie pointer
 exports.login = async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -80,13 +75,23 @@ exports.login = async (req, res) => {
             return res.status(401).json({ error: 'Invalid email or password' });
         }
 
-        const token = jwt.sign(
-            { id: user.id, role: user.role },
-            JWT_SECRET,
-            { expiresIn: '24h' }
-        );
+        // 1. Generate a secure random session ID token
+        const sessionId = crypto.randomBytes(32).toString('hex');
+        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
-        res.cookie(COOKIE_NAME, token, cookieOptions);
+        // 2. Insert the session record directly into Supabase database (user.id is UUID)
+        const { error: sessionError } = await supabase
+            .from('sessions')
+            .insert([{
+                id: sessionId,
+                user_id: user.id,
+                expires_at: expiresAt.toISOString()
+            }]);
+
+        if (sessionError) throw sessionError;
+
+        // 3. Set the database session pointer in an httpOnly cookie
+        res.cookie(COOKIE_NAME, sessionId, cookieOptions);
 
         const { password: _pw, ...safeUser } = user;
         res.status(200).json({ message: 'Logged in successfully', user: safeUser });
@@ -95,14 +100,25 @@ exports.login = async (req, res) => {
     }
 };
 
-// LOGOUT: Clear the session cookie
-exports.logout = (req, res) => {
-    res.clearCookie(COOKIE_NAME, cookieOptions);
-    res.status(200).json({ message: 'Logged out successfully' });
+// LOGOUT: Remove the session from the database and clear the cookie
+exports.logout = async (req, res) => {
+    try {
+        const sessionId = req.cookies[COOKIE_NAME];
+        if (sessionId) {
+            await supabase
+                .from('sessions')
+                .delete()
+                .eq('id', sessionId);
+        }
+
+        res.clearCookie(COOKIE_NAME, cookieOptions);
+        res.status(200).json({ message: 'Logged out successfully' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 };
 
-// ME: Return the currently logged-in user, based on the session cookie
-// (requires the `authenticate` middleware to have run first)
+// ME: Return the current user using the database session validated by middleware
 exports.getCurrentUser = async (req, res) => {
     try {
         const { data: user, error } = await supabase
@@ -159,7 +175,7 @@ exports.getUserById = async (req, res) => {
     }
 };
 
-// UPDATE: Edit a user's details (full_name, email, role, and optionally password)
+// UPDATE: Edit a user's details
 exports.updateUser = async (req, res) => {
     try {
         const { id } = req.params;
