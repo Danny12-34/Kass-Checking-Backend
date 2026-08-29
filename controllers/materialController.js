@@ -1,19 +1,38 @@
+// controllers/materialController.js
 const supabase = require('../db');
 
 // READ: Get all students with their material check records for a given term
 exports.getStudentsWithMaterials = async (req, res) => {
     try {
         const { term } = req.query;
+        const currentTerm = term || 'Term 1';
+
         const { data, error } = await supabase
             .from('students')
             .select(`
                 *,
                 material_checks(*)
             `)
-            .eq('material_checks.term', term || 'Term 1');
+            .eq('material_checks.term', currentTerm);
 
         if (error) throw error;
-        res.status(200).json(data);
+
+        // Clean up and normalize the structure so checked_by_name safely defaults to null
+        const formattedData = data.map(student => {
+            const materialChecks = student.material_checks || [];
+            
+            const processedChecks = materialChecks.map(check => ({
+                ...check,
+                checked_by_name: check.checked_by_name || null
+            }));
+
+            return {
+                ...student,
+                material_checks: processedChecks
+            };
+        });
+
+        res.status(200).json(formattedData);
     } catch (err) {
         console.error('Get Students Error:', err.message);
         res.status(500).json({ error: err.message });

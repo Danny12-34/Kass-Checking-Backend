@@ -1,3 +1,4 @@
+// server.js
 const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
@@ -5,7 +6,7 @@ require('dotenv').config();
 
 const materialRoutes = require('./routes/materialRoutes');
 const studentRoutes = require('./routes/studentRoutes');
-const onlyMaterials = require('./routes/OnlymaterialsRoutes')
+const onlyMaterials = require('./routes/OnlymaterialsRoutes');
 const signupCodesRoutes = require('./routes/signupCodesRoutes');
 const authRoutes = require('./routes/authRoutes');
 
@@ -28,7 +29,7 @@ app.use(cors({
         }
         return callback(null, true);
     },
-    credentials: true,                     // allows cookies/authorization headers to be sent
+    credentials: true,                    // allows cookies/authorization headers to be sent
 }));
 
 app.use(cookieParser());
